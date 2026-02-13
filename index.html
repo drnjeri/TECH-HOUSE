@@ -1,0 +1,239 @@
+<?php
+session_start();
+
+/* DATABASE CONNECTION */
+$conn = new mysqli("localhost","root","","techhouse");
+if($conn->connect_error){ die("DB Error"); }
+
+/* HANDLE BOOKING */
+if(isset($_POST['book'])){
+$name = htmlspecialchars($_POST['name']);
+$email = htmlspecialchars($_POST['email']);
+$service = htmlspecialchars($_POST['service']);
+$message = htmlspecialchars($_POST['message']);
+
+$stmt = $conn->prepare("INSERT INTO bookings (name,email,service,message) VALUES (?,?,?,?)");
+$stmt->bind_param("ssss",$name,$email,$service,$message);
+$stmt->execute();
+}
+
+/* HANDLE LOGIN */
+if(isset($_POST['login'])){
+$username=$_POST['username'];
+$password=$_POST['password'];
+
+$stmt=$conn->prepare("SELECT * FROM admin WHERE username=?");
+$stmt->bind_param("s",$username);
+$stmt->execute();
+$res=$stmt->get_result();
+
+if($res->num_rows>0){
+$row=$res->fetch_assoc();
+if(password_verify($password,$row['password'])){
+$_SESSION['admin']=$username;
+$_SESSION['role']=$row['role'];
+}
+}
+}
+
+/* DELETE BOOKING */
+if(isset($_GET['delete']) && isset($_SESSION['admin'])){
+$id=$_GET['delete'];
+$conn->query("DELETE FROM bookings WHERE id=$id");
+}
+
+/* LOGOUT */
+if(isset($_GET['logout'])){
+session_destroy();
+header("Location: techhouse.php");
+exit();
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TECH HOUSE 👑</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/particles.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:Poppins;
+background:black;
+color:white;
+overflow-x:hidden;
+}
+#particles-js{position:fixed;width:100%;height:100%;z-index:-1;}
+header{
+padding:20px;
+background:#111;
+border-bottom:2px solid gold;
+text-align:center;
+font-size:28px;
+color:gold;
+text-shadow:0 0 15px hotpink;
+}
+section{padding:40px;text-align:center;}
+input,select,textarea{
+padding:10px;
+margin:5px;
+width:250px;
+border-radius:10px;
+border:1px solid hotpink;
+background:#111;
+color:white;
+}
+button{
+padding:10px 20px;
+background:linear-gradient(45deg,red,hotpink);
+border:none;
+border-radius:20px;
+color:white;
+cursor:pointer;
+}
+button:hover{background:gold;color:black;}
+table{
+margin:auto;
+border-collapse:collapse;
+}
+td,th{
+border:1px solid gold;
+padding:8px;
+}
+.whatsapp{
+position:fixed;
+bottom:20px;
+right:20px;
+background:#25D366;
+padding:15px;
+border-radius:50%;
+text-decoration:none;
+color:white;
+}
+</style>
+</head>
+<body>
+
+<div id="particles-js"></div>
+
+<header>TECH HOUSE 💎 Luxury Tech Empire</header>
+
+<?php if(!isset($_SESSION['admin'])){ ?>
+
+<!-- BOOKING FORM -->
+<section>
+<h2>Book a Service 👑</h2>
+<form method="POST">
+<input type="text" name="name" placeholder="Name" required><br>
+<input type="email" name="email" placeholder="Email" required><br>
+<select name="service">
+<option>Website Development</option>
+<option>Graphic Design</option>
+<option>Cyber Security</option>
+<option>Software Development</option>
+</select><br>
+<textarea name="message" placeholder="Project Details"></textarea><br>
+<button name="book">Book Now</button>
+</form>
+
+<h3>Admin Login</h3>
+<form method="POST">
+<input type="text" name="username" placeholder="Username" required>
+<input type="password" name="password" placeholder="Password" required>
+<button name="login">Login</button>
+</form>
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
+<input type="hidden" name="cmd" value="_xclick">
+<input type="hidden" name="business" value="Wanjikusharon567@gmail.com">
+<input type="hidden" name="item_name" value="TECH HOUSE Payment">
+<input type="hidden" name="amount" value="50">
+<input type="hidden" name="currency_code" value="USD">
+<button>Pay with PayPal 💳</button>
+</form>
+
+</section>
+
+<?php } else { ?>
+
+<!-- ADMIN DASHBOARD -->
+<section>
+<h2>Welcome <?php echo $_SESSION['admin']; ?> 👑</h2>
+<a href="?logout=true"><button>Logout</button></a>
+
+<?php
+$total=$conn->query("SELECT COUNT(*) as c FROM bookings")->fetch_assoc()['c'];
+$web=$conn->query("SELECT COUNT(*) as c FROM bookings WHERE service='Website Development'")->fetch_assoc()['c'];
+$design=$conn->query("SELECT COUNT(*) as c FROM bookings WHERE service='Graphic Design'")->fetch_assoc()['c'];
+?>
+
+<h3>Total Bookings: <?php echo $total; ?></h3>
+<canvas id="chart" width="400" height="150"></canvas>
+
+<script>
+new Chart(document.getElementById('chart'),{
+type:'bar',
+data:{
+labels:['Web Dev','Graphic Design'],
+datasets:[{
+data:[<?php echo $web; ?>,<?php echo $design; ?>],
+backgroundColor:['gold','hotpink']
+}]
+}
+});
+</script>
+
+<h3>Bookings</h3>
+<table>
+<tr><th>ID</th><th>Name</th><th>Email</th><th>Service</th><th>Action</th></tr>
+<?php
+$result=$conn->query("SELECT * FROM bookings ORDER BY id DESC");
+while($row=$result->fetch_assoc()){
+echo "<tr>
+<td>{$row['id']}</td>
+<td>{$row['name']}</td>
+<td>{$row['email']}</td>
+<td>{$row['service']}</td>
+<td><a href='?delete={$row['id']}'><button>Delete</button></a></td>
+</tr>";
+}
+?>
+</table>
+</section>
+
+<?php } ?>
+
+<!-- AI CHATBOT -->
+<section>
+<h3>TECH HOUSE Assistant 🤖</h3>
+<input type="text" id="chatInput" placeholder="Ask something...">
+<div id="chatBox"></div>
+</section>
+
+<script>
+particlesJS("particles-js",{
+particles:{number:{value:60},color:{value:["#FFD700","#FF1493"]},
+size:{value:4},move:{enable:true,speed:2}}
+});
+
+document.getElementById("chatInput").addEventListener("keypress",function(e){
+if(e.key==="Enter"){
+let input=this.value.toLowerCase();
+let reply="Welcome to TECH HOUSE 👑";
+if(input.includes("price")) reply="Projects start from $50 💎";
+if(input.includes("contact")) reply="Call 0702121717 ✨";
+document.getElementById("chatBox").innerHTML+="<p style='color:hotpink;'>You: "+input+"</p>";
+document.getElementById("chatBox").innerHTML+="<p style='color:gold;'>Bot: "+reply+"</p>";
+this.value="";
+}
+});
+</script>
+
+<a class="whatsapp" href="https://wa.me/254702121717" target="_blank">💬</a>
+
+</body>
+</html>
